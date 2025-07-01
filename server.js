@@ -1,42 +1,51 @@
-const express = require('express');
-const cors = require('cors');
-const bodyParser = require('body-parser');
-const fetch = require('node-fetch');
-require('dotenv').config();
+import express from 'express';
+import dotenv from 'dotenv';
+import cors from 'cors';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = process.env.PORT || 3001;
 
+// Middlewares
 app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json()); // Use Express's built-in JSON parser
 
-app.post('/generate', async (req, res) => {
-  const userMessage = req.body.message;
+// Check for API Key on startup
+if (!process.env.GEMINI_API_KEY) {
+  throw new Error("GEMINI_API_KEY environment variable is not set.");
+}
 
+// Initialize the Google AI SDK
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+// API Route for the chatbot
+app.post('/chat', async (req, res) => {
   try {
-    const response = await fetch(\`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=\${process.env.GEMINI_API_KEY}\`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: userMessage }] }]
-      })
-    });
+    const { message } = req.body;
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required.' });
+    }
 
-    const data = await response.json();
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn’t understand.";
-    res.json({ reply });
+    // Use the SDK to generate content
+    const result = await model.generateContent(message);
+    const response = result.response;
+    const text = response.text();
+
+    res.json({ response: text });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ reply: 'An error occurred while processing your message.' });
+    console.error('Error in /chat endpoint:', error);
+    res.status(500).json({ error: 'Failed to generate AI response.' });
   }
 });
 
+// Health check route
 app.get('/', (req, res) => {
-  res.send('Nexora AI Backend is running');
+  res.send('Nexora AI Backend is running!');
 });
 
-app.listen(PORT, () => {
-  console.log(\`Server running on port \${PORT}\`);
+app.listen(port, () => {
+  console.log(`Server listening on port ${port}`);
 });
