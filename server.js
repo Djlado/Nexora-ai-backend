@@ -1,47 +1,40 @@
-const express = require("express");
-const cors = require("cors");
-const bodyParser = require("body-parser");
-const fetch = require("node-fetch");
+import express from "express";
+import cors from "cors";
+import bodyParser from "body-parser";
+import fetch from "node-fetch";
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
-// 🔐 DIRECTLY INSERTED API KEY (TEMPORARY)
-const GEMINI_API_KEY = "AIzaSyCURz7A2o4Eb0iZa_rGxP5Rxgb5zL3oUkA";
-
 app.use(cors());
 app.use(bodyParser.json());
 
-app.post("/chat", async (req, res) => {
-  const userMessage = req.body.message;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
+app.post("/api/gemini", async (req, res) => {
   try {
-    const geminiRes = await fetch(
+    const userMessage = req.body.message;
+
+    const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: userMessage }] }],
-        }),
+          contents: [{ parts: [{ text: userMessage }] }]
+        })
       }
     );
 
-    const data = await geminiRes.json();
-    const reply =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "Sorry, no response from Gemini.";
+    const data = await response.json();
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn’t understand.";
     res.json({ reply });
-  } catch (err) {
-    console.error("Gemini API error:", err);
-    res.status(500).json({ error: "Internal Server Error" });
+  } catch (error) {
+    console.error("Error contacting Gemini API:", error);
+    res.status(500).json({ error: "Failed to connect to Gemini." });
   }
 });
 
-app.get("/", (req, res) => {
-  res.send("Nexora AI backend is live with hardcoded API key!");
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+app.listen(3000, () => {
+  console.log("Nexora backend is running on port 3000");
 });
